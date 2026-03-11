@@ -1,1 +1,545 @@
 # Currency-app
+<!DOCTYPE html>
+
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="환율">
+<meta name="theme-color" content="#0a0a0f">
+<!-- 아이폰 홈 화면 아이콘 (인라인 SVG → data URL) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%230a0a1f'/%3E%3Ccircle cx='96' cy='96' r='72' fill='%23151530' stroke='%234f8eff' stroke-width='4'/%3E%3Ctext x='96' y='115' font-size='72' text-anchor='middle' fill='%234f8eff' font-family='sans-serif' font-weight='bold'%3E%E2%82%A9%3C/text%3E%3C/svg%3E">
+<title>환율 계산기</title>
+<style>
+/* 시스템 폰트 사용 - 외부 CDN 없음, Safari 완전 호환 */
+:root {
+  --bg:#0a0a0f; --sf:#12121a; --bd:rgba(255,255,255,.07);
+  --ac:#4f8eff; --ac2:#7b5ea7; --tx:#f0f0f8;
+  --mu:rgba(240,240,248,.45); --dm:rgba(240,240,248,.2);
+  --gn:#34d399;
+  --st:env(safe-area-inset-top,44px);
+  --sb:env(safe-area-inset-bottom,20px);
+  --font:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Helvetica Neue',sans-serif;
+  --mono:'SF Mono','Courier New',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+  font-family:var(--font);color:var(--tx);-webkit-font-smoothing:antialiased}
+#app{
+  width:100%;height:100vh;height:100dvh;
+  display:flex;flex-direction:column;overflow:hidden;
+  background:
+    radial-gradient(ellipse at 25% 10%,rgba(79,142,255,.09) 0%,transparent 55%),
+    radial-gradient(ellipse at 80% 85%,rgba(123,94,167,.08) 0%,transparent 50%),
+    var(--bg);
+}
+.safe-top{height:var(--st);flex-shrink:0}
+
+/* ── Header ── */
+.hdr{padding:6px 20px 8px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hdr-title{font-size:21px;font-weight:700;letter-spacing:-.6px;
+background:linear-gradient(135deg,#fff 0%,rgba(255,255,255,.55) 100%);
+-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.pill{display:flex;align-items:center;gap:5px;background:var(–sf);
+border:1px solid var(–bd);border-radius:20px;padding:4px 10px;
+font-size:11px;color:var(–mu);font-family:var(–mono);white-space:nowrap}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;
+background:var(–gn);box-shadow:0 0 6px var(–gn);animation:pulse 2s infinite}
+.dot.ld{background:#f59e0b;box-shadow:0 0 6px #f59e0b}
+.dot.er{background:#f87171;box-shadow:0 0 6px #f87171;animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.rfbtn{background:none;border:none;cursor:pointer;color:var(–mu);
+font-size:15px;padding:1px 3px;line-height:1;-webkit-appearance:none}
+.rfbtn.sp{animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Scroll ── */
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;
+padding:0 14px;padding-bottom:calc(14px + var(–sb));
+-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+
+/* ── Cards ── */
+.card{background:var(–sf);border:1px solid var(–bd);border-radius:20px;
+padding:16px 18px;margin-bottom:9px;position:relative;overflow:hidden}
+.card::before{content:’’;position:absolute;inset:0;
+background:linear-gradient(135deg,rgba(255,255,255,.04) 0%,transparent 55%);pointer-events:none}
+.card.from{border-color:rgba(79,142,255,.18)}
+.card.to{border-color:rgba(79,142,255,.38);
+background:linear-gradient(145deg,rgba(79,142,255,.13) 0%,rgba(79,142,255,.04) 100%)}
+.clbl{font-size:10px;color:var(–mu);font-weight:600;letter-spacing:.9px;
+text-transform:uppercase;margin-bottom:10px}
+.crow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.amt{flex:1;background:none;border:none;outline:none;
+font-family:var(–mono);font-size:34px;font-weight:500;
+color:var(–tx);min-width:0;caret-color:var(–ac);
+-webkit-appearance:none;appearance:none}
+.amt::placeholder{color:var(–dm)}
+.res{font-family:var(–mono);font-size:34px;font-weight:500;color:var(–ac);
+min-height:41px;display:flex;align-items:center;flex:1;min-width:0;
+word-break:break-all;letter-spacing:-.3px}
+.cbtn{display:flex;align-items:center;gap:6px;
+background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+border-radius:28px;padding:7px 11px;cursor:pointer;flex-shrink:0;
+-webkit-appearance:none;-webkit-touch-callout:none;user-select:none}
+.cbtn:active{transform:scale(.93);background:rgba(255,255,255,.13)}
+.cbtn-code{font-size:14px;font-weight:700;color:var(–tx)}
+.cbtn-chev{font-size:10px;opacity:.5;color:var(–tx)}
+.csub{font-size:11px;color:var(–dm);margin-top:5px}
+
+/* ── Swap ── */
+.swrap{display:flex;justify-content:center;margin:-1px 0;z-index:10;position:relative}
+.sbtn{width:38px;height:38px;border-radius:50%;
+background:linear-gradient(135deg,var(–ac) 0%,var(–ac2) 100%);
+border:none;cursor:pointer;color:#fff;font-size:16px;
+box-shadow:0 4px 18px rgba(79,142,255,.42);
+display:flex;align-items:center;justify-content:center;
+-webkit-appearance:none;-webkit-touch-callout:none;user-select:none;
+transition:transform .22s ease}
+.sbtn:active{transform:scale(.86) rotate(180deg)}
+
+/* ── Rate info ── */
+.rinfo{background:var(–sf);border:1px solid var(–bd);border-radius:13px;
+padding:11px 14px;display:flex;justify-content:space-between;
+align-items:center;margin-bottom:9px;gap:8px}
+.rtxt{font-size:12px;color:var(–tx);font-family:var(–mono);flex:1;min-width:0;
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rbdg{font-size:9px;color:var(–mu);background:rgba(255,255,255,.05);
+border:1px solid rgba(255,255,255,.06);border-radius:7px;
+padding:3px 7px;flex-shrink:0;white-space:nowrap}
+
+/* ── Quick ── */
+.qgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:13px}
+.qbtn{padding:9px 0;border-radius:10px;background:var(–sf);
+border:1px solid var(–bd);color:var(–mu);font-size:11px;font-weight:600;
+cursor:pointer;font-family:var(–mono);-webkit-appearance:none;
+-webkit-touch-callout:none;user-select:none;transition:all .12s}
+.qbtn:active,.qbtn.act{background:rgba(79,142,255,.16);
+border-color:rgba(79,142,255,.42);color:var(–ac)}
+
+/* ── Table ── */
+.slbl{font-size:10px;font-weight:700;color:var(–mu);letter-spacing:1.1px;
+text-transform:uppercase;padding:0 2px;margin-bottom:7px}
+.rtbl{background:var(–sf);border:1px solid var(–bd);
+border-radius:18px;overflow:hidden;margin-bottom:18px}
+.rrow{display:flex;align-items:center;padding:11px 15px;
+border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;
+-webkit-touch-callout:none;user-select:none;transition:background .1s}
+.rrow:last-child{border-bottom:none}
+.rrow:active{background:rgba(255,255,255,.05)}
+.rrow.sel{background:rgba(79,142,255,.09)}
+.rf{font-size:21px;margin-right:11px;flex-shrink:0}
+.ri{flex:1;min-width:0}.rc{font-size:13px;font-weight:700}
+.rn{font-size:10px;color:var(–dm);margin-top:1px}
+.rv{text-align:right;flex-shrink:0}
+.rkv{font-size:13px;font-weight:700;font-family:var(–mono)}
+.rut{font-size:10px;color:var(–dm);font-family:var(–mono)}
+.snote{text-align:center;font-size:10px;color:var(–dm);padding:0 0 4px}
+
+/* ── Guide Banner ── */
+.guide{background:linear-gradient(135deg,rgba(79,142,255,.12),rgba(123,94,167,.1));
+border:1px solid rgba(79,142,255,.25);border-radius:16px;
+padding:14px 16px;margin-bottom:9px}
+.guide-title{font-size:12px;font-weight:700;color:var(–ac);margin-bottom:8px}
+.guide-step{font-size:11px;color:var(–mu);line-height:1.7;display:flex;gap:8px}
+.guide-step span{color:var(–tx)}
+.guide-url{font-family:var(–mono);font-size:11px;color:var(–ac);
+background:rgba(79,142,255,.1);border-radius:6px;padding:2px 6px;
+word-break:break-all;display:inline-block;margin-top:4px}
+.guide-dismiss{margin-top:10px;width:100%;padding:8px;border-radius:9px;
+background:rgba(79,142,255,.15);border:1px solid rgba(79,142,255,.3);
+color:var(–ac);font-size:12px;font-weight:600;cursor:pointer;
+-webkit-appearance:none}
+
+/* ── Picker ── */
+.ov{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);
+-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+display:flex;flex-direction:column;justify-content:flex-end;
+opacity:0;pointer-events:none;transition:opacity .22s}
+.ov.show{opacity:1;pointer-events:all}
+.psh{background:#14141f;border-top:1px solid rgba(255,255,255,.08);
+border-radius:22px 22px 0 0;padding:0 0 var(–sb);max-height:72vh;
+display:flex;flex-direction:column;
+transform:translateY(100%);transition:transform .28s cubic-bezier(.32,.72,0,1)}
+.ov.show .psh{transform:translateY(0)}
+.phdl{width:34px;height:4px;background:rgba(255,255,255,.18);
+border-radius:2px;margin:11px auto 0}
+.phdr{display:flex;justify-content:space-between;align-items:center;
+padding:14px 18px 10px}
+.pttl{font-size:15px;font-weight:700}
+.pclose{width:27px;height:27px;border-radius:50%;background:rgba(255,255,255,.1);
+border:none;color:var(–mu);font-size:14px;cursor:pointer;
+display:flex;align-items:center;justify-content:center;-webkit-appearance:none}
+.plst{overflow-y:auto;padding:0 10px 10px;-webkit-overflow-scrolling:touch}
+.pitm{display:flex;align-items:center;gap:11px;padding:11px 9px;
+border-radius:11px;cursor:pointer;-webkit-touch-callout:none;user-select:none}
+.pitm:active{background:rgba(255,255,255,.06)}
+.pitm.sel{background:rgba(79,142,255,.13)}
+.pf{font-size:25px;flex-shrink:0}.pi{flex:1}
+.pc{font-size:14px;font-weight:700}.pn{font-size:11px;color:var(–dm)}
+.pck{font-size:16px;color:var(–ac);flex-shrink:0}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:calc(28px + var(–sb));left:50%;
+transform:translateX(-50%) translateY(16px);background:#1c1c2e;
+border:1px solid rgba(248,113,113,.3);border-radius:11px;
+padding:9px 15px;font-size:11px;color:#f87171;
+white-space:nowrap;opacity:0;transition:all .25s;
+z-index:999;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+
+</head>
+<body>
+<div id="app">
+  <div class="safe-top"></div>
+
+  <!-- Header -->
+
+  <div class="hdr">
+    <div class="hdr-title">환율 계산기</div>
+    <div class="pill">
+      <div class="dot ld" id="dot"></div>
+      <span id="stxt">로딩 중...</span>
+      <button class="rfbtn" id="rfbtn" onclick="loadRates()">↻</button>
+    </div>
+  </div>
+
+  <div class="scroll">
+
+```
+<!-- 홈 화면 설치 안내 (처음만 표시) -->
+<div class="guide" id="guide" style="display:none">
+  <div class="guide-title">📱 아이폰 홈 화면에 설치하기</div>
+  <div class="guide-step">1. <span>아래 주소를 Safari로 열기</span></div>
+  <div class="guide-url" id="guideUrl">-</div>
+  <div class="guide-step" style="margin-top:6px">2. <span>하단 공유버튼(□↑) 탭</span></div>
+  <div class="guide-step">3. <span>"홈 화면에 추가" 선택</span></div>
+  <button class="guide-dismiss" onclick="dismissGuide()">알겠어요 ✓</button>
+</div>
+
+<!-- FROM -->
+<div class="card from">
+  <div class="clbl">보내는 금액</div>
+  <div class="crow">
+    <input class="amt" id="ainput" type="number" inputmode="decimal"
+           placeholder="0" value="1" oninput="calc()">
+    <button class="cbtn" onclick="openPicker('from')">
+      <span id="ff">🇺🇸</span>
+      <span class="cbtn-code" id="fc">USD</span>
+      <span class="cbtn-chev">▼</span>
+    </button>
+  </div>
+  <div class="csub" id="fn">미국 달러</div>
+</div>
+
+<div class="swrap">
+  <button class="sbtn" onclick="doSwap()">⇅</button>
+</div>
+
+<!-- TO -->
+<div class="card to">
+  <div class="clbl">받는 금액</div>
+  <div class="crow">
+    <div class="res" id="rdisp">—</div>
+    <button class="cbtn" onclick="openPicker('to')">
+      <span id="tf">🇰🇷</span>
+      <span class="cbtn-code" id="tc">KRW</span>
+      <span class="cbtn-chev">▼</span>
+    </button>
+  </div>
+  <div class="csub" id="tn">한국 원</div>
+</div>
+
+<!-- Rate -->
+<div class="rinfo">
+  <span class="rtxt" id="rtxt">—</span>
+  <span class="rbdg">환율우대 없음</span>
+</div>
+
+<!-- Quick -->
+<div class="qgrid">
+  <button class="qbtn" onclick="setQ(1)">1</button>
+  <button class="qbtn" onclick="setQ(100)">100</button>
+  <button class="qbtn" onclick="setQ(1000)">1,000</button>
+  <button class="qbtn" onclick="setQ(10000)">10,000</button>
+</div>
+
+<!-- Table -->
+<div class="slbl">전체 환율 (KRW 기준)</div>
+<div class="rtbl" id="rtbl"></div>
+<div class="snote">📊 실시간 환율 · 하나은행 매매기준율 기준 · 환율우대 없음</div>
+```
+
+  </div><!-- /scroll -->
+</div><!-- /app -->
+
+<!-- Picker -->
+
+<div class="ov" id="ov" onclick="bgClose(event)">
+  <div class="psh">
+    <div class="phdl"></div>
+    <div class="phdr">
+      <span class="pttl" id="pttl">통화 선택</span>
+      <button class="pclose" onclick="closePicker()">✕</button>
+    </div>
+    <div class="plst" id="plst"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 통화 목록 ───────────────────────────────────────────────────────
+const CUR = [
+  {c:'KRW',n:'한국 원',         f:'🇰🇷',s:'₩',  u:1},
+  {c:'USD',n:'미국 달러',       f:'🇺🇸',s:'$',  u:1},
+  {c:'JPY',n:'일본 엔',         f:'🇯🇵',s:'¥',  u:100},
+  {c:'EUR',n:'유로',            f:'🇪🇺',s:'€',  u:1},
+  {c:'CNY',n:'중국 위안',       f:'🇨🇳',s:'¥',  u:1},
+  {c:'GBP',n:'영국 파운드',     f:'🇬🇧',s:'£',  u:1},
+  {c:'HKD',n:'홍콩 달러',       f:'🇭🇰',s:'HK$',u:1},
+  {c:'CAD',n:'캐나다 달러',     f:'🇨🇦',s:'CA$',u:1},
+  {c:'AUD',n:'호주 달러',       f:'🇦🇺',s:'A$', u:1},
+  {c:'CHF',n:'스위스 프랑',     f:'🇨🇭',s:'Fr', u:1},
+  {c:'SGD',n:'싱가포르 달러',   f:'🇸🇬',s:'S$', u:1},
+  {c:'THB',n:'태국 바트',       f:'🇹🇭',s:'฿',  u:1},
+  {c:'VND',n:'베트남 동',       f:'🇻🇳',s:'₫',  u:100},
+  {c:'MYR',n:'말레이시아 링깃', f:'🇲🇾',s:'RM', u:1},
+  {c:'PHP',n:'필리핀 페소',     f:'🇵🇭',s:'₱',  u:1},
+];
+
+// 2026년 3월 기준 fallback (하나은행 매매기준율)
+const FB = {
+  KRW:1, USD:1472, JPY:9.83, EUR:1602, CNY:202.5,
+  GBP:1891, HKD:189.2, CAD:1022, AUD:924, CHF:1641,
+  SGD:1095, THB:42.8, VND:5.78, MYR:330, PHP:25.5
+};
+
+let rates = {...FB};
+let from = 'USD', to = 'KRW', pTarget = 'from';
+const ci = c => CUR.find(x => x.c === c) || CUR[0];
+
+// ── 실시간 환율 로드 (3개 API 순차 시도) ────────────────────────────
+async function loadRates() {
+  setDot('ld', '로딩 중...');
+  const btn = document.getElementById('rfbtn');
+  btn.classList.add('sp');
+
+  const tryFetch = async (url, parse) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 7000);
+    try {
+      const r = await fetch(url, {
+        signal: ctrl.signal,
+        mode: 'cors',
+        cache: 'no-cache'
+      });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      return parse(d);
+    } catch(e) {
+      clearTimeout(timer);
+      throw e;
+    }
+  };
+
+  // 파서 1: open.er-api.com
+  const parseER = d => {
+    if (d.result !== 'success' || !d.rates) throw new Error('bad data');
+    const out = {KRW:1};
+    CUR.filter(x=>x.c!=='KRW').forEach(c => {
+      const r = d.rates[c.c];
+      if (r && r > 0) out[c.c] = (1/r) * c.u;
+    });
+    if (!out.USD || out.USD < 800 || out.USD > 3000) throw new Error('invalid USD');
+    return out;
+  };
+
+  // 파서 2: fawazahmed0
+  const parseFW = d => {
+    const kr = d.krw;
+    if (!kr) throw new Error('no krw');
+    const out = {KRW:1};
+    CUR.filter(x=>x.c!=='KRW').forEach(c => {
+      const r = kr[c.c.toLowerCase()];
+      if (r && r > 0) out[c.c] = (1/r) * c.u;
+    });
+    if (!out.USD || out.USD < 800 || out.USD > 3000) throw new Error('invalid USD');
+    return out;
+  };
+
+  const today = new Date().toISOString().slice(0,10);
+  const apis = [
+    ['https://open.er-api.com/v6/latest/KRW', parseER],
+    [`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${today}/v1/currencies/krw.json`, parseFW],
+    ['https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/krw.json', parseFW],
+  ];
+
+  for (const [url, parser] of apis) {
+    try {
+      const newRates = await tryFetch(url, parser);
+      rates = newRates;
+      const t = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+      setDot('ok', t + ' 업데이트');
+      btn.classList.remove('sp');
+      renderTable(); calc();
+      return;
+    } catch(e) { /* 다음 시도 */ }
+  }
+
+  // 모두 실패
+  rates = {...FB};
+  setDot('er', '참고 환율');
+  showToast('⚠️ 네트워크 오류 · 참고 환율 사용');
+  btn.classList.remove('sp');
+  renderTable(); calc();
+}
+
+function setDot(s, t) {
+  const d = document.getElementById('dot'), tx = document.getElementById('stxt');
+  d.className = 'dot' + (s==='ld'?' ld': s==='er'?' er':'');
+  tx.textContent = t;
+}
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── 계산 ─────────────────────────────────────────────────────────────
+function calc() {
+  const raw = document.getElementById('ainput').value;
+  const v = parseFloat(raw);
+  const el = document.getElementById('rdisp');
+  if (!raw || isNaN(v)) { el.textContent = '—'; updRate(); return; }
+  const fr = rates[from]||1, tr = rates[to]||1;
+  const fu = ci(from).u,    tu = ci(to).u;
+  const krw = from==='KRW' ? v : v*(fr/fu);
+  const res = to==='KRW'   ? krw : krw/(tr/tu);
+  el.textContent = fmt(res, to);
+  updRate();
+}
+
+function fmt(n, c) {
+  if (isNaN(n)) return '—';
+  if (c==='KRW' || c==='VND') return n.toLocaleString('ko-KR', {maximumFractionDigits:0});
+  if (c==='JPY') return n.toLocaleString('ko-KR', {maximumFractionDigits:2});
+  return n.toLocaleString('ko-KR', {maximumFractionDigits:4});
+}
+
+function updRate() {
+  const el = document.getElementById('rtxt');
+  if (from===to) { el.textContent='동일 통화'; return; }
+  const fr=rates[from]||1, tr=rates[to]||1;
+  const fu=ci(from).u, tu=ci(to).u;
+  if (to==='KRW')
+    el.textContent = `1 ${from} = ₩${(fr/fu).toLocaleString('ko-KR',{maximumFractionDigits:2})}`;
+  else if (from==='KRW')
+    el.textContent = `₩1 = ${ci(to).s}${(1/(tr/tu)).toFixed(6)}`;
+  else
+    el.textContent = `1 ${from} = ${ci(to).s}${((fr/fu)/(tr/tu)).toFixed(4)}`;
+}
+
+function setQ(v) {
+  document.getElementById('ainput').value = v;
+  calc();
+  document.querySelectorAll('.qbtn').forEach(b =>
+    b.classList.toggle('act', parseInt(b.textContent.replace(/,/g,''))===v));
+}
+
+// ── UI ────────────────────────────────────────────────────────────────
+function doSwap() {
+  [from, to] = [to, from];
+  updUI(); calc();
+}
+
+function updUI() {
+  const fi=ci(from), ti=ci(to);
+  document.getElementById('ff').textContent = fi.f;
+  document.getElementById('fc').textContent = fi.c;
+  document.getElementById('fn').textContent = fi.n;
+  document.getElementById('tf').textContent = ti.f;
+  document.getElementById('tc').textContent = ti.c;
+  document.getElementById('tn').textContent = ti.n;
+  renderTable();
+}
+
+function renderTable() {
+  document.getElementById('rtbl').innerHTML = CUR.filter(x=>x.c!=='KRW').map(c => {
+    const r = rates[c.c] || FB[c.c] || 0;
+    const disp = `₩${r.toLocaleString('ko-KR',{maximumFractionDigits:2})}`;
+    const unit = c.u>1 ? `<div class="rut">${c.u}${c.c}당</div>` : '';
+    const sel  = (from===c.c || to===c.c) ? 'sel' : '';
+    return `<div class="rrow ${sel}" onclick="pickRow('${c.c}')">
+      <span class="rf">${c.f}</span>
+      <div class="ri"><div class="rc">${c.c}</div><div class="rn">${c.n}</div></div>
+      <div class="rv"><div class="rkv">${disp}</div>${unit}</div>
+    </div>`;
+  }).join('');
+}
+
+function pickRow(c) { from=c; to='KRW'; updUI(); calc(); }
+
+// ── Picker ────────────────────────────────────────────────────────────
+function openPicker(t) {
+  pTarget = t;
+  document.getElementById('pttl').textContent = t==='from' ? '보내는 통화 선택' : '받는 통화 선택';
+  const cur = t==='from' ? from : to;
+  document.getElementById('plst').innerHTML = CUR.map(c => `
+    <div class="pitm ${c.c===cur?'sel':''}" onclick="pickCur('${c.c}')">
+      <span class="pf">${c.f}</span>
+      <div class="pi"><div class="pc">${c.c}</div><div class="pn">${c.n}</div></div>
+      ${c.c===cur ? '<span class="pck">✓</span>' : ''}
+    </div>`).join('');
+  document.getElementById('ov').classList.add('show');
+}
+function pickCur(c) {
+  if (pTarget==='from') from=c; else to=c;
+  updUI(); calc(); closePicker();
+}
+function closePicker() { document.getElementById('ov').classList.remove('show'); }
+function bgClose(e)    { if (e.target===document.getElementById('ov')) closePicker(); }
+
+// ── 설치 안내 배너 ────────────────────────────────────────────────────
+function showGuideIfNeeded() {
+  try {
+    if (localStorage.getItem('guide_dismissed')) return;
+    // Safari + 파일로 열었을 때만 표시
+    const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+    const isFile   = location.protocol === 'file:';
+    const isStandalone = window.navigator.standalone;
+    if ((isSafari || isFile) && !isStandalone) {
+      // 현재 URL 또는 netlify 안내
+      const url = location.href.startsWith('file:')
+        ? 'app.netlify.com/drop 에 ZIP 업로드 후 Safari로 열기'
+        : location.href;
+      document.getElementById('guideUrl').textContent = url;
+      document.getElementById('guide').style.display = 'block';
+    }
+  } catch(e) {}
+}
+function dismissGuide() {
+  try { localStorage.setItem('guide_dismissed','1'); } catch(e){}
+  document.getElementById('guide').style.display = 'none';
+}
+
+// ── Init ─────────────────────────────────────────────────────────────
+updUI();
+renderTable();
+calc();
+loadRates();
+showGuideIfNeeded();
+
+// Service Worker (HTTPS에서만 동작)
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+
+</body>
+</html>

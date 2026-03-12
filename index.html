@@ -382,7 +382,7 @@ async function loadRates() {
     try {
       const newRates = await tryFetch(url, parser);
       rates = newRates;
-      const t = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+      const t = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Seoul'});
       setDot('ok', t + ' 업데이트');
       btn.classList.remove('sp');
       renderTable(); calc();
